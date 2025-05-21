@@ -18,10 +18,20 @@ void error(char *fmt, ...) {
 }
 
 bool consume(char *op) {
-    if (token->kind != TK_RESERVED || strncmp(token->str, op, strlen(op)) != 0)
+    if (token->kind != TK_RESERVED || strncmp(token->str, op, strlen(op)) != 0) {
         return false;
+    }
     token = token->next;
     return true;
+}
+
+Token *consume_ident() {
+    if (token->kind != TK_IDENT) {
+        return NULL;
+    }
+    Token *t = token;
+    token = token->next;
+    return t;
 }
 
 void expect(char *op) {
@@ -40,7 +50,7 @@ int expect_number() {
     return val;
 }
 
-bool ar_eof() {
+bool at_eof() {
     return token->kind == TK_E0F;
 }
 
@@ -70,9 +80,15 @@ Token *tokenize(char *p) {
             continue;
         }
 
-        if (strchr("+-*/()<>", *p)) {
+        if (strchr("+-*/()<>=;", *p)) {
             cur = new_token(TK_RESERVED, cur, p);
             p++;
+            continue;
+        }
+
+        if ('a' <= *p && *p <= 'z') {
+            cur = new_token(TK_IDENT, cur, p++);
+            cur->len = 1;
             continue;
         }
 

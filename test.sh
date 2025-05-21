@@ -2,7 +2,7 @@ assert() {
     expected="$1"
     input="$2"
 
-    ./hscc "$input" > tmp.s
+    ./main "$input" > tmp.s
     ghc -o tmp tmp.s
     ./tmp
     actual="$?"
@@ -17,5 +17,6 @@ assert() {
 
 assert 0 0
 assert 42 42
+assert 41 12 + 34 - 5
 
 echo OK

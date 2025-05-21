@@ -6,7 +6,7 @@ I try to make C language compiler.
 
 ```
 gcc -g main.c tokenizer.c generator.c parse.c error.c -o main
-./main "12 + 34 - 5" > foo.s
+./main "a = 3; b = 5; a+b;" > foo.s
 gcc -o foo foo.s
 ./foo
 echo $?
