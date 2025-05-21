@@ -1,20 +1,24 @@
 module Tokenizer where
+
 import Data.Char (isSpace, isDigit)
+import Control.Monad.Writer
 
 data Value = INT Integer | REAL Double deriving (Show, Eq)
 
 data Token = Number Value
-            | Add | Sub | Mul | Div
+            | Add | Sub | Mul | Div | Mod
+            {-| Eq | Ne | Gt | Lt | Ge | Le
+            | And | Or | Not-}
             | Lpar | Rpar
             | Semicolon
-            | E0F
+            | Eof
             | Others Char
     deriving (Show, Eq)
 
 type Lexer = (Token, String)
 
 getToken :: String -> Lexer
-getToken [] =(E0F, "")
+getToken [] =(Eof, "")
 getToken (x:xs)
     | isSpace x = getToken xs
     | isDigit x =
@@ -31,9 +35,19 @@ getToken (x:xs)
             '-' -> (Sub, xs)
             '*' -> (Mul, xs)
             '/' -> (Div, xs)
+            '%' -> (Mod, xs)
             '(' -> (Lpar, xs)
             ')' -> (Rpar, xs)
             ';' -> (Semicolon, xs)
+            {-"==" -> (Eq,xs)
+            "!=" -> (Ne, xs)
+            '<' -> (Gt, xs)
+            '>' -> (Lt, xs)
+            "<=" -> (Ge, xs)
+            ">=" -> (Le, xs)
+            "&&" -> (And, xs)
+            "||" -> (Or, xs)
+            '!' -> (Not, xs)-}
             _   -> (Others x, xs)
 
 lexer :: String -> ([Token], String)
@@ -41,6 +55,6 @@ lexer xs =
     let (t, ys) = getToken xs
     in case t of
         Semicolon -> ([Semicolon], ys)
-        E0F       -> ([E0F], ys)
+        Eof       -> ([Eof], ys)
         _         -> let (ts,zs) = lexer ys
                      in ts `seq` zs `seq` (t:ts, zs)
