@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 Token *token;
 
@@ -16,16 +17,15 @@ void error(char *fmt, ...) {
     exit(1);
 }
 
-bool consume(char op) {
-    if (token->kind != TK_RESERVED || token->str[0] != op) {
+bool consume(char *op) {
+    if (token->kind != TK_RESERVED || strncmp(token->str, op, strlen(op)) != 0)
         return false;
-    }
     token = token->next;
     return true;
 }
 
-void expect(char op) {
-    if (token->kind != TK_RESERVED || token->str[0] != op) {
+void expect(char *op) {
+    if (token->kind != TK_RESERVED || strncmp(token->str, op, strlen(op))) {
         error("not %c", op);
     }
     token = token->next;
@@ -63,8 +63,16 @@ Token *tokenize(char *p) {
             continue;
         }
 
-        if (*p == '+' || *p == '-' || *p == '*' || *p == '/') {
-            cur = new_token(TK_RESERVED, cur, p++);
+        if (!strncmp(p, "!=", 2) || !strncmp(p, "==", 2) ||
+            !strncmp(p, "<=", 2) || !strncmp(p, ">=", 2)) {
+            cur = new_token(TK_RESERVED, cur, p);
+            p += 2;
+            continue;
+        }
+
+        if (strchr("+-*/()<>", *p)) {
+            cur = new_token(TK_RESERVED, cur, p);
+            p++;
             continue;
         }
 

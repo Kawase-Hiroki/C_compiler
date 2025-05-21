@@ -23,11 +23,41 @@ void gen(Node *node) {
         printf("\tsub rax, rdi\n");
         break;
     case ND_MUL:
-        printf("\tmul rax, rdi\n");
+        printf("\timul rax, rdi\n");
         break;
     case ND_DIV:
         printf("\tcqo\n");
         printf("\tidiv rdi\n");
+        break;
+    case ND_LT:
+        printf("\tcmp rax, rdi\n");
+        printf("\tsetl al\n");
+        printf("\tmovzb rax, al\n");
+        break;
+    case ND_GT:
+        printf("\tcmp rax, rdi\n");
+        printf("\tsetg al\n");
+        printf("\tmovzb rax, al\n");
+        break;
+    case ND_LE:
+        printf("\tcmp rax, rdi\n");
+        printf("\tsetle al\n");
+        printf("\tmovzb rax, al\n");
+        break;
+    case ND_GE:
+        printf("\tcmp rax, rdi\n");
+        printf("\tsetge al\n");
+        printf("\tmovzb rax, al\n");
+        break;
+    case ND_EQ:
+        printf("\tcmp rax, rdi\n");
+        printf("\tsete al\n");
+        printf("\tmovzb rax, al\n");
+        break;
+    case ND_NE:
+        printf("\tcmp rax, rdi\n");
+        printf("\tsetne\n");
+        printf("\tmovzb rax, al\n");
         break;
     }
 

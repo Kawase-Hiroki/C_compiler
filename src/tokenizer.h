@@ -16,13 +16,14 @@ struct Token {
     Token *next;
     int val;
     char *str;
+    int len;
 };
 
 extern Token *token;
 
 void error(char *fmt, ...);
-bool consume(char op);
-void expect(char op);
+bool consume(char *op);
+void expect(char *op);
 int expect_number(void);
 bool ar_eof(void);
 Token *new_token(TokenKind kind, Token *cur, char *str);
