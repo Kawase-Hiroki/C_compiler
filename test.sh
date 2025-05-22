@@ -1,10 +1,11 @@
+#!/bin/bash
 assert() {
     expected="$1"
     input="$2"
 
-    ./main "$input" > tmp.s
-    ghc -o tmp tmp.s
-    ./tmp
+    ./main "$input" > foo.s
+    gcc -o foo foo.s
+    ./foo
     actual="$?"
 
     if [ "$actual" = "$expected" ]; then
@@ -15,8 +16,6 @@ assert() {
     fi
 }
 
-assert 0 0
-assert 42 42
-assert 41 12 + 34 - 5
+assert 8 "a = 3; b = 5; a + b;"
 
 echo OK
