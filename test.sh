@@ -17,5 +17,6 @@ assert() {
 }
 
 assert 8 "a = 3; b = 5; a + b;"
+assert 6 "foo = 1; bar = 2 + 3; foo + bar;" 
 
 echo OK

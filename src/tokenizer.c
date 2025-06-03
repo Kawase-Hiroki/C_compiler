@@ -8,6 +8,7 @@
 #include <string.h>
 
 Token *token;
+LVar *locals;
 
 void error(char *fmt, ...) {
     va_list ap;
@@ -62,6 +63,15 @@ Token *new_token(TokenKind kind, Token *cur, char *str) {
     return tok;
 }
 
+LVar *find_lvar(Token *tok) {
+    for (LVar *var = locals; var; var = var->next) {
+        if (var->len == tok->len && !memcmp(tok->str, var->name, var->len)) {
+            return var;
+        }
+    }
+    return NULL;
+}
+
 Token *tokenize(char *p) {
     Token head;
     head.next = NULL;
@@ -86,9 +96,16 @@ Token *tokenize(char *p) {
             continue;
         }
 
-        if ('a' <= *p && *p <= 'z') {
-            cur = new_token(TK_IDENT, cur, p++);
-            cur->len = 1;
+        if (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') || *p == '_') {
+            char *start = p;
+            while (('a' <= *p && *p <= 'z') ||
+                   ('A' <= *p && *p <= 'Z') ||
+                   ('0' <= *p && *p <= '9') ||
+                   *p == '_') {
+                p++;
+            }
+            cur = new_token(TK_IDENT, cur, start);
+            cur->len = p - start;
             continue;
         }
 
