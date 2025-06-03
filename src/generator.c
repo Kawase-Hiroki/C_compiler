@@ -1,8 +1,9 @@
 
 #include "generator.h"
-#include "tokenizer.h"
 
 #include <stdio.h>
+
+#include "tokenizer.h"
 
 void gen_lval(Node *node) {
     if (node->kind != ND_LVAR) {
@@ -14,6 +15,14 @@ void gen_lval(Node *node) {
 }
 
 void gen(Node *node) {
+    if (node->kind == ND_RETURN) {
+        gen(node->lhs);
+        printf("\tpop rax\n");
+        printf("\tmov rsp, rbp\n");
+        printf("\tpop rbp\n");
+        printf("\tret\n");
+        return;
+    }
     switch (node->kind) {
     case ND_NUM:
         printf("\tpush %d\n", node->val);

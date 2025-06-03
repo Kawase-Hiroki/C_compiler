@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "error.h"
 #include "tokenizer.h"
 
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
@@ -32,6 +33,15 @@ void program() {
 }
 
 Node *stmt() {
+    if (token->kind == TK_RETURN) {
+        token = token->next;
+        Node *node = calloc(1, sizeof(Node));
+        node->kind = ND_RETURN;
+        node->lhs = expr();
+        expect(";");
+        return node;
+    }
+
     Node *node = expr();
     expect(";");
     return node;

@@ -15,6 +15,7 @@ typedef enum {
     ND_NE,
     ND_ASSIGN,
     ND_LVAR,
+    ND_RETURN,
 } NodeKind;
 
 typedef struct Node Node;
