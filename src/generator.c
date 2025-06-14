@@ -5,6 +5,8 @@
 
 #include "tokenizer.h"
 
+int count = 0;
+
 void gen_lval(Node *node) {
     if (node->kind != ND_LVAR) {
         error("lvalue required as left operand of assignment");
@@ -23,6 +25,64 @@ void gen(Node *node) {
         printf("\tret\n");
         return;
     }
+
+    if (node->kind == ND_IF) {
+        count++;
+        gen(node->cond);
+        printf("\tpop rax\n");
+        printf("\tcmp rax, 0\n");
+        printf("\tje .Lelse%d\n", count);
+        gen(node->then);
+        printf("\tjmp .Lend%d\n", count);
+        printf(".Lelse%d:\n", count);
+        if (node->els) {
+            gen(node->els);
+        }
+        printf(".Lend%d:\n", count);
+        return;
+    }
+
+    if (node->kind == ND_WHILE) {
+        count++;
+        printf(".Lbegin%d:\n", count);
+        gen(node->lhs);
+        printf("\tpop rax\n");
+        printf("\tcmp rax, 0\n");
+        printf("\tje .Lend%d\n", count);
+        gen(node->rhs);
+        printf("\tjmp .Lbegin%d\n", count);
+        printf(".Lend%d:\n", count);
+        return;
+    }
+
+    if (node->kind == ND_FOR) {
+        count++;
+        if (node->init) {
+            gen(node->init);
+        }
+        printf(".Lbegin%d:\n", count);
+        if (node->cond) {
+            gen(node->cond);
+            printf("\tpop rax\n");
+            printf("\tcmp rax, 0\n");
+            printf("\tje .Lend%d\n", count);
+        }
+        gen(node->inc);
+        if (node->body) {
+            gen(node->body);
+        }
+        printf("\tjmp .Lbegin%d\n", count);
+        printf(".Lend%d:\n", count);
+        return;
+    }
+
+    if (node->kind == ND_BLOCK) {
+        for (int i = 0; i < node->stmt_count; i++) {
+            gen(node->stmts[i]);
+        }
+        return;
+    }
+
     switch (node->kind) {
     case ND_NUM:
         printf("\tpush %d\n", node->val);
@@ -90,7 +150,7 @@ void gen(Node *node) {
         break;
     case ND_NE:
         printf("\tcmp rax, rdi\n");
-        printf("\tsetne\n");
+        printf("\tsetne al\n");
         printf("\tmovzb rax, al\n");
         break;
     }

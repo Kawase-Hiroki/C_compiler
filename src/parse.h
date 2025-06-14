@@ -16,6 +16,11 @@ typedef enum {
     ND_ASSIGN,
     ND_LVAR,
     ND_RETURN,
+    ND_IF,
+    ND_WHILE,
+    ND_FOR,
+    ND_ELSE,
+    ND_BLOCK,
 } NodeKind;
 
 typedef struct Node Node;
@@ -26,7 +31,19 @@ struct Node {
     Node *rhs;
     int val;
     int offset;
+
+    Node *then;
+    Node *els;
+    Node *init;
+    Node *cond;
+    Node *inc;
+    Node *body;
+
+    Node **stmts;
+    int stmt_count;
 };
+
+extern int count;
 
 extern Node *code[100];
 

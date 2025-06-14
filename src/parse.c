@@ -42,6 +42,72 @@ Node *stmt() {
         return node;
     }
 
+    if (token->kind == TK_IF) {
+        token = token->next;
+        expect("(");
+        Node *node = calloc(1, sizeof(Node));
+        node->kind = ND_IF;
+        node->cond = expr();
+        expect(")");
+        node->then = stmt();
+        if (consume("else")) {
+            node->els = stmt();
+        }
+        return node;
+    }
+
+    if (token->kind == TK_WHILE) {
+        token = token->next;
+        expect("(");
+        Node *node = calloc(1, sizeof(Node));
+        node->kind = ND_WHILE;
+        node->lhs = expr();
+        expect(")");
+        node->rhs = stmt();
+        return node;
+    }
+
+    if (token->kind == TK_FOR) {
+        token = token->next;
+        expect("(");
+        Node *node = calloc(1, sizeof(Node));
+        node->kind = ND_FOR;
+
+        if (!consume(";")) {
+            node->init = expr();
+            expect(";");
+        }
+        if (!consume(";")) {
+            node->cond = expr();
+            expect(";");
+        }
+        if (!consume(")")) {
+            node->inc = expr();
+            expect(")");
+        }
+        node->body = stmt();
+        return node;
+    }
+
+    if (consume("{")) {
+        Node *node = calloc(1, sizeof(Node));
+        node->kind = ND_BLOCK;
+
+        Node **stmts = NULL;
+        int cap = 0;
+        int len = 0;
+        while (!consume("}")) {
+            if (len == cap) {
+                cap = cap ? cap * 2 : 4;
+                stmts = realloc(stmts, sizeof(Node *) * cap);
+            }
+            stmts[len++] = stmt();
+        }
+        node->stmts = stmts;
+        node->stmt_count = len;
+        return node;
+    }
+
     Node *node = expr();
     expect(";");
     return node;
