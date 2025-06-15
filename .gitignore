@@ -36,3 +36,6 @@ src/*.S
 src/*.asm
 src/*.
 src/foo
+
+test.c
+memo.txt

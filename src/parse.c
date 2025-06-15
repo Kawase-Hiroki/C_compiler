@@ -3,9 +3,22 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "error.h"
 #include "tokenizer.h"
+
+int locals_size() {
+    int size = 0;
+    for (LVar *var = locals; var; var = var->next) {
+        size += 8;
+    }
+    if (size % 16 != 0) {
+        size = ((size / 16) + 1) * 16;
+    }
+    return size;
+}
+
 
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
     Node *node = calloc(1, sizeof(Node));
@@ -27,9 +40,28 @@ Node *code[100];
 void program() {
     int i = 0;
     while (!at_eof()) {
-        code[i++] = stmt();
+        code[i++] = function();
     }
     code[i] = NULL;
+}
+
+Node *function() {
+    locals = NULL;
+
+    Token *tok = consume_ident();
+    if (!tok)
+        error("need function name");
+
+    char *name = strndup(tok->str, tok->len);
+
+    expect("(");
+    expect(")");
+
+    Node *node = calloc(1, sizeof(Node));
+    node->kind = ND_FUNCDEF;
+    node->funcname = name;
+    node->body = stmt();
+    return node;
 }
 
 Node *stmt() {
@@ -200,6 +232,15 @@ Node *primary() {
     Token *tok = consume_ident();
 
     if (tok) {
+        if (consume("(")) {
+            expect(")");
+
+            Node *node = calloc(1, sizeof(Node));
+            node->kind = ND_CALL;
+            node->funcname = strndup(tok->str, tok->len);
+            return node;
+        }
+
         Node *node = calloc(1, sizeof(Node));
         node->kind = ND_LVAR;
 
@@ -209,7 +250,7 @@ Node *primary() {
         } else {
             lvar = calloc(1, sizeof(LVar));
             lvar->next = locals;
-            lvar->name = tok->str;
+            lvar->name = strndup(tok->str, tok->len);
             lvar->len = tok->len;
             if (locals) {
                 lvar->offset = locals->offset + 8;

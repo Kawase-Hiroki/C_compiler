@@ -3,6 +3,8 @@
 
 #include "parse.h"
 
+extern int count;
+
 void gen_lval(Node *node);
 void gen(Node *node);
 

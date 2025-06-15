@@ -76,10 +76,35 @@ void gen(Node *node) {
         return;
     }
 
+    if (node->kind == ND_FUNCDEF) {
+        printf(".global %s\n", node->funcname);
+        printf("%s:\n", node->funcname);
+
+        printf("\tpush rbp\n");
+        printf("\tmov rbp, rsp\n");
+
+        int stack_size = locals_size();
+        printf("\tsub rsp, %d\n", stack_size);
+
+        gen(node->body);
+
+        printf("\tmov rsp, rbp\n");
+        printf("\tpop rbp\n");
+        printf("\tret\n");
+
+        return;
+    }
+
     if (node->kind == ND_BLOCK) {
         for (int i = 0; i < node->stmt_count; i++) {
             gen(node->stmts[i]);
         }
+        return;
+    }
+
+    if (node->kind == ND_CALL) {
+        printf("\tcall %s\n", node->funcname);
+        printf("\tpush rax\n"); 
         return;
     }
 

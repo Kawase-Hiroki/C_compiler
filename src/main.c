@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "error.h"
 #include "generator.h"
@@ -17,20 +18,27 @@ int main(int argc, char **argv) {
     program();
 
     printf(".intel_syntax noprefix\n");
-    printf(".global main\n");
-    printf("main:\n");
-
-    printf("\tpush rbp\n");
-    printf("\tmov rbp, rsp\n");
-    printf("\tsub rsp, 208\n");
 
     for (int i = 0; code[i]; i++) {
-        gen(code[i]);
-        printf("\tpop rax\n");
-    }
+        if (strcmp(code[i]->funcname, "main") == 0) {
+            printf(".global main\n");
+            printf("main:\n");
+            printf("\tpush rbp\n");
+            printf("\tmov rbp, rsp\n");
+            printf("\tsub rsp, 208\n");
+        } else {
+            printf(".global %s\n", code[i]->funcname);
+            printf("%s:\n", code[i]->funcname);
+            printf("\tpush rbp\n");
+            printf("\tmov rbp, rsp\n");
+            printf("\tsub rsp, 208\n");
+        }
 
-    printf("\tmov rsp, rbp\n");
-    printf("\tpop rbp\n");
-    printf("\tret\n");
+        gen(code[i]->body);
+
+        printf("\tmov rsp, rbp\n");
+        printf("\tpop rbp\n");
+        printf("\tret\n");
+    }
     return 0;
 }
