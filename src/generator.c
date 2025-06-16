@@ -8,12 +8,18 @@
 int count = 0;
 
 void gen_lval(Node *node) {
-    if (node->kind != ND_LVAR) {
+    switch (node->kind) {
+    case ND_LVAR:
+        printf("\tmov rax, rbp\n");
+        printf("\tsub rax, %d\n", node->offset);
+        printf("\tpush rax\n");
+        return;
+    case ND_DEREF:
+        gen(node->lhs);
+        return;
+    default:
         error("lvalue required as left operand of assignment");
     }
-    printf("\tmov rax, rbp\n");
-    printf("\tsub rax, %d\n", node->offset);
-    printf("\tpush rax\n");
 }
 
 void gen(Node *node) {
@@ -125,6 +131,15 @@ void gen(Node *node) {
         printf("\tpop rax\n");
         printf("\tmov [rax], rdi\n");
         printf("\tpush rdi\n");
+        return;
+    case ND_ADDR:
+        gen_lval(node->lhs);
+        return;
+    case ND_DEREF:
+        gen(node->lhs);
+        printf("\tpop rax\n");
+        printf("\tmov rax, [rax]\n");
+        printf("\tpush rax\n");
         return;
     }
 

@@ -24,5 +24,6 @@ assert 1 "main () {n = 10; if (n == 10) {return 1;}}"
 assert 0 "main () {n = 10; if (n != 10) {return 1;} else {return 0;}}"
 assert 10 "main () {i = 0; while (i < 10) {i = i + 1;} return i;}"
 assert 1 "foo() {return 1;} main() {return foo();}"
+assert 3 "main () {x = 3; y = &x; return *y;}"
 
 echo OK
