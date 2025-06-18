@@ -20,25 +20,7 @@ int main(int argc, char **argv) {
     printf(".intel_syntax noprefix\n");
 
     for (int i = 0; code[i]; i++) {
-        if (strcmp(code[i]->funcname, "main") == 0) {
-            printf(".global main\n");
-            printf("main:\n");
-            printf("\tpush rbp\n");
-            printf("\tmov rbp, rsp\n");
-            printf("\tsub rsp, 208\n");
-        } else {
-            printf(".global %s\n", code[i]->funcname);
-            printf("%s:\n", code[i]->funcname);
-            printf("\tpush rbp\n");
-            printf("\tmov rbp, rsp\n");
-            printf("\tsub rsp, 208\n");
-        }
-
-        gen(code[i]->body);
-
-        printf("\tmov rsp, rbp\n");
-        printf("\tpop rbp\n");
-        printf("\tret\n");
+        gen(code[i]);
     }
     return 0;
 }

@@ -19,7 +19,6 @@ int locals_size() {
     return size;
 }
 
-
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
     Node *node = calloc(1, sizeof(Node));
     node->kind = kind;
@@ -55,11 +54,50 @@ Node *function() {
     char *name = strndup(tok->str, tok->len);
 
     expect("(");
-    expect(")");
+
+    Node **params = NULL;
+    int param_count = 0;
+
+    if (!consume(")")) {
+        while (1) {
+            Token *argtok = consume_ident();
+            if (!argtok)
+                error("expected argument name");
+
+            Node *arg = calloc(1, sizeof(Node));
+            arg->kind = ND_LVAR;
+            arg->varname = strndup(argtok->str, argtok->len);
+
+            LVar *lvar = calloc(1, sizeof(LVar));
+            lvar->name = strndup(argtok->str, argtok->len);
+            lvar->len = argtok->len;
+
+            if (locals == NULL) {
+                lvar->offset = 8;
+            } else {
+                lvar->offset = locals->offset + 8;
+            }
+            lvar->next = locals;
+            locals = lvar;
+
+            arg->offset = lvar->offset;
+
+            params = realloc(params, sizeof(Node *) * (param_count + 1));
+            params[param_count++] = arg;
+
+            if (consume(")"))
+                break;
+            expect(",");
+        }
+    }
 
     Node *node = calloc(1, sizeof(Node));
     node->kind = ND_FUNCDEF;
     node->funcname = name;
+
+    node->stmts = params;
+    node->stmt_count = param_count;
+
     node->body = stmt();
     return node;
 }
@@ -237,11 +275,24 @@ Node *primary() {
 
     if (tok) {
         if (consume("(")) {
-            expect(")");
+            Node **args = NULL;
+            int arg_count = 0;
+            if (!consume(")")) {
+                while (1) {
+                    args = realloc(args, sizeof(Node *) * (arg_count + 1));
+                    args[arg_count++] = assign();
+                    if (consume(")"))
+                        break;
+                    expect(",");
+                }
+            } else {
+            }
 
             Node *node = calloc(1, sizeof(Node));
             node->kind = ND_CALL;
             node->funcname = strndup(tok->str, tok->len);
+            node->stmts = args;
+            node->stmt_count = arg_count;
             return node;
         }
 

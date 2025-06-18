@@ -40,6 +40,7 @@ struct Node {
     int offset;
 
     char *funcname;
+    char *varname;
 
     Node *then;
     Node *els;

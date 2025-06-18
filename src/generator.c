@@ -7,6 +7,8 @@
 
 int count = 0;
 
+char *arg_registers[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+
 void gen_lval(Node *node) {
     switch (node->kind) {
     case ND_LVAR:
@@ -92,6 +94,15 @@ void gen(Node *node) {
         int stack_size = locals_size();
         printf("\tsub rsp, %d\n", stack_size);
 
+        for (int i = 0; i < node->stmt_count; i++) {
+            if (i >= sizeof(arg_registers) / sizeof(*arg_registers)) {
+                error("Too many arguments for register passing. Only up to 6 arguments are supported."); // 追加
+            }                                                                                       // 追加
+            printf("\tmov rax, rbp\n");                                                             // 追加
+            printf("\tsub rax, %d\n", node->stmts[i]->offset);                                      // 追加
+            printf("\tmov [rax], %s\n", arg_registers[i]);                                         // 追加
+        }                                                                                           // 追加
+
         gen(node->body);
 
         printf("\tmov rsp, rbp\n");
@@ -109,8 +120,19 @@ void gen(Node *node) {
     }
 
     if (node->kind == ND_CALL) {
+        for (int i = 0; i < node->stmt_count; i++) {
+            gen(node->stmts[i]);
+        }
+
+        for (int i = node->stmt_count - 1; i >= 0; i--) {
+            if (i >= sizeof(arg_registers) / sizeof(*arg_registers)) {
+                error("Too many arguments for register passing. Only up to 6 arguments are supported.");
+            }
+            printf("\tpop %s\n", arg_registers[i]);
+        }
+
         printf("\tcall %s\n", node->funcname);
-        printf("\tpush rax\n"); 
+        printf("\tpush rax\n");
         return;
     }
 
