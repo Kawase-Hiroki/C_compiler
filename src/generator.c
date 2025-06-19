@@ -163,6 +163,8 @@ void gen(Node *node) {
         printf("\tmov rax, [rax]\n");
         printf("\tpush rax\n");
         return;
+    case ND_NULL:
+        return;
     }
 
     gen(node->lhs);

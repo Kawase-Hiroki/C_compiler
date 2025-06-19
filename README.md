@@ -7,7 +7,7 @@ I try to make C language compiler.
 ```
 cd /home/hiroki/C_compiler
 gcc -g src/main.c src/tokenizer.c src/generator.c src/parse.c src/error.c -o main
-./main "foo(x) { return x + 1; } main() { return foo(2); }" > foo.s
+./main "int foo(int x) {return x + 1;} int main() {int x; x = 1; return foo(x);}" > foo.s
 gcc -o foo foo.s
 ./foo
 echo $?

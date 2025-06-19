@@ -34,6 +34,10 @@ Node *new_node_num(int val) {
     return node;
 }
 
+bool is_typename() {
+    return token->kind == TK_RESERVED && token->len == 3 && strncmp(token->str, "int", 3) == 0;
+}
+
 Node *code[100];
 
 void program() {
@@ -47,6 +51,12 @@ void program() {
 Node *function() {
     locals = NULL;
 
+    if (is_typename()) {
+        token = token->next;
+    } else {
+        error("expected type name before function name");
+    }
+
     Token *tok = consume_ident();
     if (!tok)
         error("need function name");
@@ -58,12 +68,18 @@ Node *function() {
     Node **params = NULL;
     int param_count = 0;
 
-    if (!consume(")")) {
+    if (consume(")")) {
+    } else {
         while (1) {
+            if (is_typename()) {
+                token = token->next;
+            } else {
+                error("expected type name");
+            }
             Token *argtok = consume_ident();
             if (!argtok)
                 error("expected argument name");
-
+            
             Node *arg = calloc(1, sizeof(Node));
             arg->kind = ND_LVAR;
             arg->varname = strndup(argtok->str, argtok->len);
@@ -85,8 +101,9 @@ Node *function() {
             params = realloc(params, sizeof(Node *) * (param_count + 1));
             params[param_count++] = arg;
 
-            if (consume(")"))
+            if (consume(")")) {
                 break;
+            }
             expect(",");
         }
     }
@@ -103,6 +120,26 @@ Node *function() {
 }
 
 Node *stmt() {
+    if (is_typename()) {
+        token = token->next;
+        Token *tok = consume_ident();
+        if (!tok)
+            error("expected variable name");
+
+        LVar *lvar = calloc(1, sizeof(LVar));
+        lvar->name = strndup(tok->str, tok->len);
+        lvar->len = tok->len;
+        lvar->offset = locals ? locals->offset + 8 : 8;
+        lvar->next = locals;
+        locals = lvar;
+
+        expect(";");
+
+        Node *node = calloc(1, sizeof(Node));
+        node->kind = ND_NULL;
+        return node;
+    }
+
     if (token->kind == TK_RETURN) {
         token = token->next;
         Node *node = calloc(1, sizeof(Node));
@@ -272,7 +309,7 @@ Node *primary() {
         return node;
     }
     Token *tok = consume_ident();
-
+    
     if (tok) {
         if (consume("(")) {
             Node **args = NULL;
@@ -285,7 +322,6 @@ Node *primary() {
                         break;
                     expect(",");
                 }
-            } else {
             }
 
             Node *node = calloc(1, sizeof(Node));
@@ -300,6 +336,7 @@ Node *primary() {
         node->kind = ND_LVAR;
 
         LVar *lvar = find_lvar(tok);
+        
         if (lvar) {
             node->offset = lvar->offset;
         } else {

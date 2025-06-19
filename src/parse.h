@@ -28,6 +28,7 @@ typedef enum {
     ND_FUNCDEF,
     ND_ADDR,
     ND_DEREF,
+    ND_NULL,
 } NodeKind;
 
 typedef struct Node Node;
@@ -63,8 +64,9 @@ extern Node *code[100];
 int locals_size();
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs);
 Node *new_node_num(int val);
-Node *function(void);
+bool is_typename();
 void program();
+Node *function(void);
 Node *stmt(void);
 Node *expr(void);
 Node *equality(void);

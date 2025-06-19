@@ -36,7 +36,8 @@ Token *consume_ident() {
 }
 
 void expect(char *op) {
-    if (token->kind != TK_RESERVED || strncmp(token->str, op, strlen(op))) {
+    int len = strlen(op);
+    if (token->kind != TK_RESERVED || token->len != len || strncmp(token->str, op, len) != 0) {
         error("not %s", op);
     }
     token = token->next;
@@ -127,6 +128,12 @@ Token *tokenize(char *p) {
 
         if (!strncmp(p, "for", 3) && !is_alnum(p[3])) {
             cur = new_token(TK_FOR, cur, p, 3);
+            p += 3;
+            continue;
+        }
+
+        if (!strncmp(p, "int", 3) && !is_alnum(p[3])) {
+            cur = new_token(TK_RESERVED, cur, p, 3);
             p += 3;
             continue;
         }
