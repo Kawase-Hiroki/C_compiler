@@ -96,13 +96,12 @@ void gen(Node *node) {
 
         for (int i = 0; i < node->stmt_count; i++) {
             if (i >= sizeof(arg_registers) / sizeof(*arg_registers)) {
-                error("Too many arguments for register passing. Only up to 6 arguments are supported."); // 追加
-            }                                                                                       // 追加
-            printf("\tmov rax, rbp\n");                                                             // 追加
-            printf("\tsub rax, %d\n", node->stmts[i]->offset);                                      // 追加
-            printf("\tmov [rax], %s\n", arg_registers[i]);                                         // 追加
-        }                                                                                           // 追加
-
+                error("Too many arguments for register passing. Only up to 6 arguments are supported.");
+            }
+            printf("\tmov rax, rbp\n");
+            printf("\tsub rax, %d\n", node->stmts[i]->offset);
+            printf("\tmov [rax], %s\n", arg_registers[i]);
+        }
         gen(node->body);
 
         printf("\tmov rsp, rbp\n");
