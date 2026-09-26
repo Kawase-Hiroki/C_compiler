@@ -1,80 +1,58 @@
 #ifndef PARSE_H
 #define PARSE_H
-
 #include "tokenizer.h"
-
-
-typedef enum {
-    ND_ADD,
-    ND_SUB,
-    ND_MUL,
-    ND_DIV,
-    ND_NUM,
-    ND_LT,
-    ND_GT,
-    ND_LE,
-    ND_GE,
-    ND_EQ,
-    ND_NE,
-    ND_ASSIGN,
-    ND_LVAR,
-    ND_RETURN,
-    ND_IF,
-    ND_WHILE,
-    ND_FOR,
-    ND_ELSE,
-    ND_BLOCK,
-    ND_CALL,
-    ND_FUNCDEF,
-    ND_ADDR,
-    ND_DEREF,
-    ND_NULL,
-} NodeKind;
-
+typedef enum { ND_ADD,
+               ND_SUB,
+               ND_MUL,
+               ND_DIV,
+               ND_NUM,
+               ND_LT,
+               ND_GT,
+               ND_LE,
+               ND_GE,
+               ND_EQ,
+               ND_NE,
+               ND_ASSIGN,
+               ND_LVAR,
+               ND_RETURN,
+               ND_IF,
+               ND_WHILE,
+               ND_FOR,
+               ND_BLOCK,
+               ND_CALL,
+               ND_FUNCDEF,
+               ND_ADDR,
+               ND_DEREF,
+               ND_NULL,
+               ND_LOGAND,
+               ND_LOGOR,
+               ND_NOT,
+               ND_BREAK,
+               ND_CONTINUE,
+               ND_GVAR,
+               ND_STR,
+               ND_SIZEOF } NodeKind;
 typedef struct Node Node;
-
 struct Node {
     NodeKind kind;
-    Node *lhs;
-    Node *rhs;
-    int val;
+    Node *lhs, *rhs, *then, *els, *init, *cond, *inc, *body;
+    long val;
     int offset;
-
-    char *funcname;
-    char *varname;
-
-    Node *then;
-    Node *els;
-    Node *init;
-    Node *cond;
-    Node *inc;
-    Node *body;
-
-    Node **stmts;
+    char* name;
+    char* str;
+    int len;
+    Type* ty;
+    LVar* var;
+    Node** stmts;
     int stmt_count;
 };
-
-typedef struct {
-    char *name;
-    Node *body;
-    LVar *locals;
-} Function;
-
-extern Node *code[100];
-int locals_size();
-Node *new_node(NodeKind kind, Node *lhs, Node *rhs);
-Node *new_node_num(int val);
-bool is_typename();
-void program();
-Node *function(void);
-Node *stmt(void);
-Node *expr(void);
-Node *equality(void);
-Node *assign(void);
-Node *relational(void);
-Node *add(void);
-Node *mul(void);
-Node *unary(void);
-Node *primary(void);
-
+extern Node* code[256];
+Type* type_int(void);
+Type* type_char(void);
+Type* pointer_to(Type* base);
+Type* array_of(Type* base, int len);
+int locals_size(void);
+void program(void);
+void gen(Node* node);
+void error(char* fmt, ...);
 #endif

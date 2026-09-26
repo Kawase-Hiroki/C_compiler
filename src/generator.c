@@ -1,178 +1,185 @@
-
-#include "generator.h"
-
 #include <stdio.h>
 
+#include "parse.h"
 #include "tokenizer.h"
-
-int count = 0;
-
-char *arg_registers[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-
-void gen_lval(Node *node) {
-    switch (node->kind) {
-    case ND_LVAR:
-        printf("\tmov rax, rbp\n");
-        printf("\tsub rax, %d\n", node->offset);
+static int labels, loop_depth, loop_end[256], loop_cont[256];
+static char* argregs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+void gen(Node* n);
+static int width(Type* t) { return t && t->kind == TY_CHAR ? 1 : t && t->kind == TY_PTR ? 8
+                                                                                        : 4; }
+static void address(Node* n) {
+    if (n->kind == ND_LVAR) {
+        if (n->var->is_global)
+            printf("\tlea rax, [rip + %s]\n", n->var->name);
+        else
+            printf("\tlea rax, [rbp - %d]\n", n->offset);
         printf("\tpush rax\n");
         return;
-    case ND_DEREF:
-        gen(node->lhs);
-        return;
-    default:
-        error("lvalue required as left operand of assignment");
     }
+    if (n->kind == ND_DEREF) {
+        gen(n->lhs);
+        return;
+    }
+    error("not an lvalue");
 }
-
-void gen(Node *node) {
-    if (node->kind == ND_RETURN) {
-        gen(node->lhs);
+void gen(Node* n) {
+    if (!n)
+        return;
+    if (n->kind == ND_NUM) {
+        printf("\tpush %ld\n", n->val);
+        return;
+    }
+    if (n->kind == ND_STR) {
+        printf(".pushsection .rodata\n%s:\n\t.byte ", n->name);
+        for (int i = 0; i < n->len; i++) printf("%s%d", i ? "," : "", (unsigned char)n->str[i]);
+        printf("%s\n.popsection\n", n->len ? ",0" : "0");
+        printf("\tlea rax, [rip + %s]\n\tpush rax\n", n->name);
+        return;
+    }
+    if (n->kind == ND_GVAR) {
+        printf("\t.comm %s, %d, %d\n", n->var->name, n->var->ty->size, n->var->ty->size >= 8 ? 8 : n->var->ty->size);
+        return;
+    }
+    if (n->kind == ND_LVAR) {
+        if (n->ty->kind == TY_ARRAY) {
+            address(n);
+            return;
+        }
+        address(n);
         printf("\tpop rax\n");
-        printf("\tmov rsp, rbp\n");
-        printf("\tpop rbp\n");
-        printf("\tret\n");
-        return;
-    }
-
-    if (node->kind == ND_IF) {
-        count++;
-        gen(node->cond);
-        printf("\tpop rax\n");
-        printf("\tcmp rax, 0\n");
-        printf("\tje .Lelse%d\n", count);
-        gen(node->then);
-        printf("\tjmp .Lend%d\n", count);
-        printf(".Lelse%d:\n", count);
-        if (node->els) {
-            gen(node->els);
-        }
-        printf(".Lend%d:\n", count);
-        return;
-    }
-
-    if (node->kind == ND_WHILE) {
-        count++;
-        printf(".Lbegin%d:\n", count);
-        gen(node->lhs);
-        printf("\tpop rax\n");
-        printf("\tcmp rax, 0\n");
-        printf("\tje .Lend%d\n", count);
-        gen(node->rhs);
-        printf("\tjmp .Lbegin%d\n", count);
-        printf(".Lend%d:\n", count);
-        return;
-    }
-
-    if (node->kind == ND_FOR) {
-        count++;
-        if (node->init) {
-            gen(node->init);
-        }
-        printf(".Lbegin%d:\n", count);
-        if (node->cond) {
-            gen(node->cond);
-            printf("\tpop rax\n");
-            printf("\tcmp rax, 0\n");
-            printf("\tje .Lend%d\n", count);
-        }
-        gen(node->inc);
-        if (node->body) {
-            gen(node->body);
-        }
-        printf("\tjmp .Lbegin%d\n", count);
-        printf(".Lend%d:\n", count);
-        return;
-    }
-
-    if (node->kind == ND_FUNCDEF) {
-        printf(".global %s\n", node->funcname);
-        printf("%s:\n", node->funcname);
-
-        printf("\tpush rbp\n");
-        printf("\tmov rbp, rsp\n");
-
-        int stack_size = locals_size();
-        printf("\tsub rsp, %d\n", stack_size);
-
-        for (int i = 0; i < node->stmt_count; i++) {
-            if (i >= sizeof(arg_registers) / sizeof(*arg_registers)) {
-                error("Too many arguments for register passing. Only up to 6 arguments are supported.");
-            }
-            printf("\tmov rax, rbp\n");
-            printf("\tsub rax, %d\n", node->stmts[i]->offset);
-            printf("\tmov [rax], %s\n", arg_registers[i]);
-        }
-        gen(node->body);
-
-        printf("\tmov rsp, rbp\n");
-        printf("\tpop rbp\n");
-        printf("\tret\n");
-
-        return;
-    }
-
-    if (node->kind == ND_BLOCK) {
-        for (int i = 0; i < node->stmt_count; i++) {
-            gen(node->stmts[i]);
-        }
-        return;
-    }
-
-    if (node->kind == ND_CALL) {
-        for (int i = 0; i < node->stmt_count; i++) {
-            gen(node->stmts[i]);
-        }
-
-        for (int i = node->stmt_count - 1; i >= 0; i--) {
-            if (i >= sizeof(arg_registers) / sizeof(*arg_registers)) {
-                error("Too many arguments for register passing. Only up to 6 arguments are supported.");
-            }
-            printf("\tpop %s\n", arg_registers[i]);
-        }
-
-        printf("\tcall %s\n", node->funcname);
+        if (width(n->ty) == 1)
+            printf("\tmovsxb rax, byte ptr [rax]\n");
+        else if (width(n->ty) == 4)
+            printf("\tmovsxd rax, dword ptr [rax]\n");
+        else
+            printf("\tmov rax, [rax]\n");
         printf("\tpush rax\n");
         return;
     }
-
-    switch (node->kind) {
-    case ND_NUM:
-        printf("\tpush %d\n", node->val);
+    if (n->kind == ND_ADDR) {
+        address(n->lhs);
         return;
-    case ND_LVAR:
-        gen_lval(node);
+    }
+    if (n->kind == ND_DEREF) {
+        gen(n->lhs);
+        if (n->ty && n->ty->kind == TY_ARRAY)
+            return;
         printf("\tpop rax\n");
-        printf("\tmov rax, [rax]\n");
+        if (width(n->ty) == 1)
+            printf("\tmovsxb rax, byte ptr [rax]\n");
+        else if (width(n->ty) == 4)
+            printf("\tmovsxd rax, dword ptr [rax]\n");
+        else
+            printf("\tmov rax, [rax]\n");
         printf("\tpush rax\n");
         return;
-    case ND_ASSIGN:
-        gen_lval(node->lhs);
-        gen(node->rhs);
-        printf("\tpop rdi\n");
-        printf("\tpop rax\n");
-        printf("\tmov [rax], rdi\n");
+    }
+    if (n->kind == ND_ASSIGN) {
+        address(n->lhs);
+        gen(n->rhs);
+        printf("\tpop rdi\n\tpop rax\n");
+        if (width(n->lhs->ty) == 1)
+            printf("\tmov byte ptr [rax], dil\n");
+        else if (width(n->lhs->ty) == 4)
+            printf("\tmov dword ptr [rax], edi\n");
+        else
+            printf("\tmov [rax], rdi\n");
         printf("\tpush rdi\n");
         return;
-    case ND_ADDR:
-        gen_lval(node->lhs);
-        return;
-    case ND_DEREF:
-        gen(node->lhs);
-        printf("\tpop rax\n");
-        printf("\tmov rax, [rax]\n");
-        printf("\tpush rax\n");
-        return;
-    case ND_NULL:
+    }
+    if (n->kind == ND_RETURN) {
+        gen(n->lhs);
+        printf("\tpop rax\n\tmov rsp, rbp\n\tpop rbp\n\tret\n");
         return;
     }
-
-    gen(node->lhs);
-    gen(node->rhs);
-
-    printf("\tpop rdi\n");
-    printf("\tpop rax\n");
-
-    switch (node->kind) {
+    if (n->kind == ND_IF) {
+        int id = ++labels;
+        gen(n->cond);
+        printf("\tpop rax\n\ttest rax, rax\n\tje .Lelse%d\n", id);
+        gen(n->then);
+        printf("\tjmp .Lifend%d\n.Lelse%d:\n", id, id);
+        gen(n->els);
+        printf(".Lifend%d:\n", id);
+        return;
+    }
+    if (n->kind == ND_WHILE || n->kind == ND_FOR) {
+        int id = ++labels;
+        loop_end[loop_depth] = id;
+        loop_cont[loop_depth++] = (n->kind == ND_FOR ? -id : id);
+        if (n->kind == ND_FOR)
+            gen(n->init);
+        printf(".Lbegin%d:\n", id);
+        if (n->kind == ND_WHILE)
+            gen(n->lhs);
+        else
+            gen(n->cond);
+        if (n->kind == ND_WHILE || n->cond)
+            printf("\tpop rax\n\ttest rax, rax\n\tje .Lend%d\n", id);
+        gen(n->kind == ND_WHILE ? n->rhs : n->body);
+        if (n->kind == ND_FOR) {
+            printf(".Lcontinue%d:\n", id);
+            gen(n->inc);
+        }
+        printf("\tjmp .Lbegin%d\n.Lend%d:\n", id, id);
+        loop_depth--;
+        return;
+    }
+    if (n->kind == ND_BREAK || n->kind == ND_CONTINUE) {
+        if (!loop_depth)
+            error("break/continue outside loop");
+        if (n->kind == ND_BREAK)
+            printf("\tjmp .Lend%d\n", loop_end[loop_depth - 1]);
+        else if (loop_cont[loop_depth - 1] < 0)
+            printf("\tjmp .Lcontinue%d\n", -loop_cont[loop_depth - 1]);
+        else
+            printf("\tjmp .Lbegin%d\n", loop_cont[loop_depth - 1]);
+        return;
+    }
+    if (n->kind == ND_BLOCK) {
+        for (int i = 0; i < n->stmt_count; i++) gen(n->stmts[i]);
+        return;
+    }
+    if (n->kind == ND_FUNCDEF) {
+        printf(".global %s\n%s:\n\tpush rbp\n\tmov rbp, rsp\n\tsub rsp, %d\n", n->name, n->name, (n->offset + 15) / 16 * 16);
+        for (int i = 0; i < n->stmt_count; i++) {
+            if (i >= 6)
+                error("maximum of six parameters supported");
+            printf("\tmov [rbp - %d], %s\n", n->stmts[i]->offset, argregs[i]);
+        }
+        gen(n->body);
+        printf("\tmov rsp, rbp\n\tpop rbp\n\tret\n");
+        return;
+    }
+    if (n->kind == ND_CALL) {
+        for (int i = 0; i < n->stmt_count; i++) gen(n->stmts[i]);
+        for (int i = n->stmt_count - 1; i >= 0; i--) {
+            if (i >= 6)
+                error("maximum of six arguments supported");
+            printf("\tpop %s\n", argregs[i]);
+        }
+        printf("\txor eax, eax\n\tcall %s\n\tpush rax\n", n->name);
+        return;
+    }
+    if (n->kind == ND_LOGAND || n->kind == ND_LOGOR) {
+        int id = ++labels;
+        gen(n->lhs);
+        printf("\tpop rax\n\ttest rax, rax\n");
+        printf(n->kind == ND_LOGAND ? "\tje .Llogic%d\n" : "\tjne .Llogic%d\n", id);
+        gen(n->rhs);
+        printf("\tpop rax\n\ttest rax, rax\n\tsetne al\n\tmovzx rax, al\n\tjmp .Llogicend%d\n.Llogic%d:\n\tmov rax, %d\n.Llogicend%d:\n\tpush rax\n", id, id, n->kind == ND_LOGOR, id);
+        return;
+    }
+    if (n->kind == ND_NOT) {
+        gen(n->lhs);
+        printf("\tpop rax\n\ttest rax, rax\n\tsete al\n\tmovzx rax, al\n\tpush rax\n");
+        return;
+    }
+    if (n->kind == ND_NULL)
+        return;
+    gen(n->lhs);
+    gen(n->rhs);
+    printf("\tpop rdi\n\tpop rax\n");
+    switch (n->kind) {
     case ND_ADD:
         printf("\tadd rax, rdi\n");
         break;
@@ -183,40 +190,22 @@ void gen(Node *node) {
         printf("\timul rax, rdi\n");
         break;
     case ND_DIV:
-        printf("\tcqo\n");
-        printf("\tidiv rdi\n");
-        break;
-    case ND_LT:
-        printf("\tcmp rax, rdi\n");
-        printf("\tsetl al\n");
-        printf("\tmovzb rax, al\n");
-        break;
-    case ND_GT:
-        printf("\tcmp rax, rdi\n");
-        printf("\tsetg al\n");
-        printf("\tmovzb rax, al\n");
-        break;
-    case ND_LE:
-        printf("\tcmp rax, rdi\n");
-        printf("\tsetle al\n");
-        printf("\tmovzb rax, al\n");
-        break;
-    case ND_GE:
-        printf("\tcmp rax, rdi\n");
-        printf("\tsetge al\n");
-        printf("\tmovzb rax, al\n");
+        printf("\tcqo\n\tidiv rdi\n");
         break;
     case ND_EQ:
-        printf("\tcmp rax, rdi\n");
-        printf("\tsete al\n");
-        printf("\tmovzb rax, al\n");
-        break;
     case ND_NE:
-        printf("\tcmp rax, rdi\n");
-        printf("\tsetne al\n");
-        printf("\tmovzb rax, al\n");
+    case ND_LT:
+    case ND_LE:
+    case ND_GT:
+    case ND_GE:
+        printf("\tcmp rax, rdi\n\tset%s al\n\tmovzx rax, al\n", n->kind == ND_EQ ? "e" : n->kind == ND_NE ? "ne"
+                                                                                     : n->kind == ND_LT   ? "l"
+                                                                                     : n->kind == ND_LE   ? "le"
+                                                                                     : n->kind == ND_GT   ? "g"
+                                                                                                          : "ge");
         break;
+    default:
+        error("unsupported expression node");
     }
-
     printf("\tpush rax\n");
 }

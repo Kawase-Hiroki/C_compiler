@@ -2,165 +2,182 @@
 
 #include <ctype.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-Token *token;
-LVar *locals;
-
-void error(char *fmt, ...) {
+Token* token;
+LVar *locals, *globals;
+void error(char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
+    if (token && user_input && token->str >= user_input && token->str <= user_input + strlen(user_input)) {
+        char *loc = token->str, *begin = loc, *end = loc;
+        while (begin > user_input && begin[-1] != '\n') begin--;
+        while (*end && *end != '\n') end++;
+        fwrite(begin, 1, (size_t)(end - begin), stderr);
+        fputc('\n', stderr);
+        for (char* p = begin; p < loc; p++) fputc(*p == '\t' ? '\t' : ' ', stderr);
+        fputs("^ ", stderr);
+    }
     vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n");
+    va_end(ap);
+    fputc('\n', stderr);
     exit(1);
 }
-
-bool consume(char *op) {
-    if (token->kind != TK_RESERVED || strncmp(token->str, op, strlen(op)) != 0) {
+bool consume(char* op) {
+    size_t n = strlen(op);
+    if (token->kind != TK_RESERVED || token->len != (int)n || strncmp(token->str, op, n))
         return false;
-    }
     token = token->next;
     return true;
 }
-
-Token *consume_ident() {
-    if (token->kind != TK_IDENT) {
+Token* consume_ident(void) {
+    if (token->kind != TK_IDENT)
         return NULL;
-    }
-    Token *t = token;
+    Token* t = token;
     token = token->next;
     return t;
 }
-
-void expect(char *op) {
-    int len = strlen(op);
-    if (token->kind != TK_RESERVED || token->len != len || strncmp(token->str, op, len) != 0) {
-        error("not %s", op);
-    }
+void expect(char* op) {
+    if (!consume(op))
+        error("expected '%s'", op);
+}
+long expect_number(void) {
+    if (token->kind != TK_NUM)
+        error("expected number");
+    long v = token->val;
     token = token->next;
+    return v;
 }
-
-int expect_number() {
-    if (token->kind != TK_NUM) {
-        error("not number");
+bool at_eof(void) { return token->kind == TK_EOF; }
+int is_alnum(char c) { return isalnum((unsigned char)c) || c == '_'; }
+static Token* new_token(Token* cur, TokenKind k, char* s, int n) {
+    Token* t = calloc(1, sizeof(*t));
+    t->kind = k;
+    t->str = s;
+    t->len = n;
+    cur->next = t;
+    return t;
+}
+static int unescape(char c) {
+    switch (c) {
+    case 'n':
+        return '\n';
+    case 't':
+        return '\t';
+    case 'r':
+        return '\r';
+    case '0':
+        return 0;
+    case '\\':
+        return '\\';
+    case '"':
+        return '"';
+    case '\'':
+        return '\'';
+    default:
+        return c;
     }
-    int val = token->val;
-    token = token->next;
-    return val;
 }
-
-bool at_eof() {
-    return token->kind == TK_E0F;
-}
-
-int is_alnum(char c) {
-    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '_';
-}
-
-Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
-    Token *tok = calloc(1, sizeof(Token));
-    tok->kind = kind;
-    tok->str = str;
-    tok->len = len;
-    cur->next = tok;
-    return tok;
-}
-
-LVar *find_lvar(Token *tok) {
-    for (LVar *var = locals; var; var = var->next) {
-        if (var->len == tok->len && !memcmp(tok->str, var->name, var->len)) {
-            return var;
-        }
-    }
-    return NULL;
-}
-
-Token *tokenize(char *p) {
-    Token head;
-    head.next = NULL;
-    Token *cur = &head;
-
+Token* tokenize(char* p) {
+    Token head = {0}, *cur = &head;
     while (*p) {
-        if (isspace(*p)) {
+        if (isspace((unsigned char)*p)) {
             p++;
             continue;
         }
-
-        if (!strncmp(p, "!=", 2) || !strncmp(p, "==", 2) ||
-            !strncmp(p, "<=", 2) || !strncmp(p, ">=", 2)) {
-            cur = new_token(TK_RESERVED, cur, p, 2);
+        if (!strncmp(p, "//", 2)) {
+            p += 2;
+            while (*p && *p != '\n') p++;
+            continue;
+        }
+        if (!strncmp(p, "/*", 2)) {
+            p += 2;
+            while (*p && strncmp(p, "*/", 2)) p++;
+            if (!*p)
+                error("unterminated block comment");
             p += 2;
             continue;
         }
-
-        if (strchr("+-*/()<>=;{}&,", *p)) {
-            cur = new_token(TK_RESERVED, cur, p, 1);
-            p++;
-            continue;
-        }
-
-        if (!strncmp(p, "return", 6) && !is_alnum(p[6])) {
-            cur = new_token(TK_RETURN, cur, p, 6);
-            p += 6;
-            continue;
-        }
-
-        if (!strncmp(p, "if", 2) && !is_alnum(p[2])) {
-            cur = new_token(TK_IF, cur, p, 2);
-            p += 2;
-            continue;
-        }
-
-        if (!strncmp(p, "else", 4) && !is_alnum(p[4])) {
-            cur = new_token(TK_RESERVED, cur, p, 4);
-            p += 4;
-            continue;
-        }
-
-        if (!strncmp(p, "while", 5) && !is_alnum(p[5])) {
-            cur = new_token(TK_WHILE, cur, p, 5);
-            p += 5;
-            continue;
-        }
-
-        if (!strncmp(p, "for", 3) && !is_alnum(p[3])) {
-            cur = new_token(TK_FOR, cur, p, 3);
-            p += 3;
-            continue;
-        }
-
-        if (!strncmp(p, "int", 3) && !is_alnum(p[3])) {
-            cur = new_token(TK_RESERVED, cur, p, 3);
-            p += 3;
-            continue;
-        }
-
-        if (('a' <= *p && *p <= 'z') || ('A' <= *p && *p <= 'Z') || *p == '_') {
-            char *start = p;
-            while (('a' <= *p && *p <= 'z') ||
-                   ('A' <= *p && *p <= 'Z') ||
-                   ('0' <= *p && *p <= '9') ||
-                   *p == '_') {
-                p++;
+        if (*p == '"' || *p == '\'') {
+            char quote = *p++;
+            char* buf = calloc(strlen(p) + 1, 1);
+            int n = 0;
+            while (*p && *p != quote) {
+                if (*p == '\\') {
+                    p++;
+                    if (!*p)
+                        error("unterminated escape");
+                    buf[n++] = unescape(*p++);
+                } else
+                    buf[n++] = *p++;
             }
-            cur = new_token(TK_IDENT, cur, start, p - start);
+            if (!*p)
+                error("unterminated literal");
+            p++;
+            Token* t = new_token(cur, quote == '"' ? TK_STR : TK_CHARLIT, p - n - 1, n);
+            t->contents = buf;
+            t->contents_len = n;
+            cur = t;
+            if (quote == '\'' && n != 1)
+                error("character literal must contain one character");
+            if (quote == '\'')
+                t->val = (unsigned char)buf[0];
             continue;
         }
-
-        if (isdigit(*p)) {
-            char *start = p;
-            cur = new_token(TK_NUM, cur, p, 0);
-            cur->val = strtol(p, &p, 10);
-            cur->len = p - start;
+        if (!strncmp(p, "!=", 2) || !strncmp(p, "==", 2) || !strncmp(p, "<=", 2) || !strncmp(p, ">=", 2) || !strncmp(p, "&&", 2) || !strncmp(p, "||", 2)) {
+            cur = new_token(cur, TK_RESERVED, p, 2);
+            p += 2;
             continue;
         }
-
-        error("cant tokenize");
+        if (strchr("+-*/()<>=;{}&,![]", *p)) {
+            cur = new_token(cur, TK_RESERVED, p, 1);
+            p++;
+            continue;
+        }
+        struct {
+            char* s;
+            TokenKind k;
+        } kws[] = {{"return", TK_RETURN}, {"if", TK_IF}, {"else", TK_ELSE}, {"while", TK_WHILE}, {"for", TK_FOR}, {"break", TK_BREAK}, {"continue", TK_CONTINUE}, {"sizeof", TK_SIZEOF}};
+        int found = 0;
+        for (unsigned i = 0; i < sizeof(kws) / sizeof(*kws); i++) {
+            int n = strlen(kws[i].s);
+            if (!strncmp(p, kws[i].s, n) && !is_alnum(p[n])) {
+                cur = new_token(cur, kws[i].k, p, n);
+                p += n;
+                found = 1;
+                break;
+            }
+        }
+        if (found)
+            continue;
+        if (isalpha((unsigned char)*p) || *p == '_') {
+            char* s = p;
+            while (is_alnum(*p)) p++;
+            int n = p - s;
+            cur = new_token(cur, TK_RESERVED, s, n);
+            if (!((n == 3 && !strncmp(s, "int", 3)) || (n == 4 && !strncmp(s, "char", 4))))
+                cur->kind = TK_IDENT;
+            continue;
+        }
+        if (isdigit((unsigned char)*p)) {
+            char* s = p;
+            long v = strtol(p, &p, 0);
+            cur = new_token(cur, TK_NUM, s, p - s);
+            cur->val = v;
+            continue;
+        }
+        error("cannot tokenize near: %.16s", p);
     }
-
-    new_token(TK_E0F, cur, p, 0);
+    new_token(cur, TK_EOF, p, 0);
     return head.next;
+}
+LVar* find_lvar(Token* t) {
+    for (LVar* v = locals; v; v = v->next)
+        if (v->len == t->len && !memcmp(t->str, v->name, v->len))
+            return v;
+    for (LVar* v = globals; v; v = v->next)
+        if (v->len == t->len && !memcmp(t->str, v->name, v->len))
+            return v;
+    return NULL;
 }

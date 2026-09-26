@@ -1,17 +1,41 @@
-# C-_compiler
+# C compiler
 
-I try to make C language compiler.
+小さなCサブセットのコンパイラです。Cで書かれたコンパイラがx86-64向けのIntel記法アセンブリを出力し、GCCで実行ファイルにできます。
 
-## How to perform compile
+## ビルドと実行
 
-```
-cd /home/hiroki/C_compiler
-gcc -g src/main.c src/tokenizer.c src/generator.c src/parse.c src/error.c -o main
-./main "int foo(int x) {return x + 1;} int main() {int x; x = 1; return foo(x);}" > foo.s
-gcc -o foo foo.s
-./foo
-echo $?
+```sh
+make
+./main example.c > example.s
+ gcc -o example example.s
+./example
 ```
 
-chmod a+x test.sh
+ソース文字列を直接渡す使い方もできます。
+
+```sh
+./main 'int main() { return 42; }' > example.s
+```
+
+## 対応する機能
+
+- `int`、`char`、ポインタ型、一次元および入れ子の配列
+- ローカル変数、グローバル変数、関数定義と最大6個の整数/ポインタ引数
+- 四則演算、比較、論理演算、代入、ポインタ加減算、添字、`sizeof`
+- `return`、`if/else`、`while`、`for`、`break`、`continue`、ブロック
+- 文字・文字列リテラル、行コメント、ブロックコメント
+- Cファイルからの入力と、エラー位置の簡易表示
+
+## テスト
+
+テストケースと実行ハーネスはCで書いています。テストプログラムが入力Cファイルを生成し、コンパイラとGCCを実行して戻り値を照合します。
+
+```sh
+make test
+# または
 ./test.sh
+```
+
+## 制限
+
+教育用の小さな実装で、C言語全体には対応していません。関数プロトタイプ、構造体、共用体、浮動小数点、`void`、型変換、複雑な初期化式、配列引数、ブロック単位の変数スコープなどは未対応です。関数呼び出しは整数・ポインタの先頭6引数をレジスタで渡す範囲に限ります。
